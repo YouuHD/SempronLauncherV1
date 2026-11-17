@@ -5,11 +5,14 @@ using System.Diagnostics;
 using Microsoft.Win32;
 using System.IO;
 using System.Text.RegularExpressions;
+using System.Linq;
 
 namespace Launcher_v1
 {
-    public class SteamService
+    public class SteamService : IGamePlatform
     {
+
+        public string PlatformName => "Steam";
         public List<Game> ScanInstalledGames()
         {
             List<Game> games = new();
@@ -84,16 +87,25 @@ namespace Launcher_v1
                     if (!Directory.Exists(gamePath))
                         continue;
 
+                    string executablePath = FindExecutable(installDir);
+
+
                     games.Add(new Game
                     {
-                        AppId = appId,
+                        Id = appId.ToString(),
                         Name = name,
-                        InstallDir = gamePath
+                        Platform = "Steam",
+                        InstallDir = gamePath,
+                        LaunchType = GameLaunchType.Steam,
+                        ProcessName = executablePath != null ? Path.GetFileNameWithoutExtension(executablePath) : string.Empty,
+
+
                     });
                 }
             }
 
             return games;
+            //return new List<Game>();
         
         }
 
@@ -107,11 +119,51 @@ namespace Launcher_v1
 
             return match.Success ? match.Groups[1].Value : "";
         }
-        public void LaunchGame(int appId)
+
+        private string FindExecutable(string installDir)
         {
+            if (!Directory.Exists(installDir))
+                return null;
+
+            string[] excluded =
+            {
+        "unins",
+        "setup",
+        "config",
+        "crash",
+        "launcher"
+    };
+
+            var executables = Directory.GetFiles(
+                installDir,
+                "*.exe",
+                SearchOption.AllDirectories
+            );
+
+            foreach (string exe in executables)
+            {
+                string fileName = Path.GetFileNameWithoutExtension(exe);
+
+                if (excluded.Any(x =>
+                    fileName.Contains(x, StringComparison.OrdinalIgnoreCase)))
+                {
+                    continue;
+                }
+
+                return exe;
+            }
+
+            return null;
+        }
+        public void LaunchGame(Game game)
+        {
+            if(game == null) {
+                return;
+            }
+
             var startInfo = new ProcessStartInfo
             {
-                FileName = $"steam://rungameid/{appId}",
+                FileName = $"steam://rungameid/{game.Id}",
                 UseShellExecute = true
             };
 
